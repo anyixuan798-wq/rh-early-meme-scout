@@ -41,7 +41,14 @@ export async function fetchJson<T>(
       }
       return (await res.json()) as T;
     } catch (err) {
-      last = err;
+      // AbortController timeout fires when an endpoint is being throttled /
+      // tarpitted (Cloudflare does this to flagged IPs). Surface a readable
+      // message instead of the raw "signal is aborted without reason".
+      if (err instanceof DOMException && err.name === "AbortError") {
+        last = new HttpError(0, `timeout ${url}`);
+      } else {
+        last = err;
+      }
       if (i < retries) await sleep(400 * (i + 1));
     } finally {
       clearTimeout(t);

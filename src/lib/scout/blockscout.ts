@@ -5,7 +5,7 @@ import {
   PONS_LOCKER,
   TRANSFER_PAGES,
 } from "./constants";
-import { asAddr, fetchJson, num } from "./http";
+import { asAddr, fetchJson, num, sleep } from "./http";
 
 const BS = "https://robinhoodchain.blockscout.com/api/v2";
 
@@ -86,9 +86,21 @@ export async function fetchFactoryEvents(): Promise<{
   let pages = 0;
   let qs = "";
   for (let i = 0; i < LOG_PAGES_MAX; i++) {
-    const page = await fetchJson<LogPage>(
-      `${BS}/addresses/${PONS_FACTORY}/logs${qs}`,
-    );
+    let page: LogPage;
+    try {
+      // Log pages are heavy (up to ~100KB); give them room and keep a modest
+      // human-ish pace between pages so bursts don't trip Cloudflare bot
+      // scoring on the visitor's IP.
+      page = await fetchJson<LogPage>(
+        `${BS}/addresses/${PONS_FACTORY}/logs${qs}`,
+        { timeoutMs: 20_000, retries: 2 },
+      );
+    } catch {
+      // First page failing = real outage, surface it. A mid-pagination blip
+      // just ends the walk early with whatever we already collected.
+      if (pages === 0) throw new Error("工厂事件页获取失败 (Blockscout 可能暂时风控了本机 IP，稍后自动重试)");
+      break;
+    }
     pages++;
     for (const item of page.items ?? []) {
       const decoded = item.decoded;
@@ -113,6 +125,7 @@ export async function fetchFactoryEvents(): Promise<{
         break;
       }
     }
+    if (i < LOG_PAGES_MAX - 1) await sleep(300);
     qs = `?block_number=${n.block_number}&index=${n.index}&items_count=${n.items_count ?? 50}`;
   }
   return { events, pages };

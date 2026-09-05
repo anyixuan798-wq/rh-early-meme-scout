@@ -8,9 +8,18 @@
 import { isAddress } from "./format";
 import { inspectAddress, quotePrices, runScan, scoreNarrative } from "./scan";
 import { fetchStockAssets } from "./stocks";
+import { sleep } from "./http";
 
 export async function scanRadar(input?: { data?: { force?: boolean } }) {
-  return runScan(Boolean(input?.data?.force));
+  const result = await runScan(Boolean(input?.data?.force));
+  // Blockscout/CF can tarpit a visitor IP for a few seconds-to-minutes; give
+  // the first scan one second chance before surfacing the error state. On
+  // error the module cache stays empty, so the retry does a full fresh scan.
+  if (result.meta.error) {
+    await sleep(1500);
+    return runScan(true);
+  }
+  return result;
 }
 
 export async function inspectToken(input: { data: { address: string } }) {
