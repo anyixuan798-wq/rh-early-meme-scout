@@ -22,6 +22,8 @@ npm run dev      # http://localhost:5173
 npm run build    # 产出 dist/ (静态站点)
 ```
 
+⚠️ 本地开发注意:**Blockscout API 对 `http://` 来源的 Referer 一律回 500**(https 正常)。本地 dev 是 http,雷达页会一直报 500 扫不出数据——这是上游 API 的行为,不是代码 bug。本地要看到真数据:用 https 起本地服务(自签证书 + `--ignore-certificate-errors`)或直接看线上站。其余数据源(DexScreener / RPC / 股票快照)不受影响。
+
 ## 数据从哪来
 
 | 模块 | 来源 | 模式 |
